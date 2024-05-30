@@ -6,8 +6,10 @@ from tqdm import tqdm
 import math
 import importlib
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from datetime import datetime
 import re
+import seaborn as sns
 
 time_options = ['0,01', '0,1', '0,5', '1', '5', '10']
 excel_df = pd.DataFrame(columns=time_options)
@@ -105,42 +107,41 @@ for z in time_options:
     # rename the columns 
     returns_for_decile.columns = ['returns', 'sharpe_ratios']
     returns_for_decile
-
-
+    
+    
     # Assuming returns_for_decile is already defined and contains 'returns' and 'sharpe_ratios' for each decile
     # Sample data for demonstration
     deciles = np.arange(1, 11)  # Deciles 1 through 10
-
-
+    
+    
     # Plotting
     fig, ax1 = plt.subplots(figsize=(20, 10))
-
+    
     color_for_returns = 'tab:blue' # dark blue color
     color_for_sharpe = 'tab:red'
-
+    
     # Bar plot for returns
-    ax1.bar(deciles, returns_for_decile['returns'], color=color_for_returns, alpha=0.6, label='Returns')
-    ax1.set_ylabel('Return', color=color_for_returns)
-    ax1.tick_params(axis='y', labelcolor=color_for_returns)
+    ax1.bar(deciles, returns_for_decile['returns'], color=color_for_returns, alpha=0.6, label='Return')
+    ax1.set_ylabel('Return', color=color_for_returns, fontsize=16)
+    ax1.tick_params(axis='y', labelcolor=color_for_returns, labelsize=14)
     ax1.set_xticks(deciles)  # Ensure we have ticks for each decile
     # Explicitly setting the x-tick labels to correspond to each decile
-    ax1.set_xticklabels([f'Decile {d}' for d in deciles], rotation=45, fontsize=10)
-
-
+    ax1.set_xticklabels([f'Decile {d}' for d in deciles], rotation=45, fontsize=16)
+    
+    
     # Secondary y-axis for Sharpe ratios
     ax2 = ax1.twinx()
     ax2.plot(deciles, returns_for_decile['sharpe_ratios'], color=color_for_sharpe, marker='o', linestyle='--', linewidth=2, markersize=8, label='Sharpe Ratios')
-    ax2.set_ylabel('Sharpe Ratio', color=color_for_sharpe)
-    ax2.tick_params(axis='y', labelcolor=color_for_sharpe)
-
+    ax2.set_ylabel('Sharpe Ratio', color=color_for_sharpe, fontsize=16)
+    ax2.tick_params(axis='y', labelcolor=color_for_sharpe, labelsize=14)
+    
     # Adding combined legend for both plots
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax2.legend(lines + lines2, labels + labels2, loc='upper left')
-
+    ax2.legend(lines + lines2, labels + labels2, loc='upper left', fontsize=20)
+    
     plt.tight_layout()
-
-    plt.title(f"Returns and Sharpe Ratios by Decile for {selected_time} Seconds", fontsize=16)
+    #plt.title(f"Returns and Sharpe Ratios by Decile for {selected_time} Seconds", fontsize=16)
     plt.tight_layout()  # Adjust layout
     #plt.show()
 
@@ -187,6 +188,119 @@ for z in time_options:
 
     # save the picture to a file
     fig.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/table_for_decile_{time_dict[selected_time]}.png')
+
+
+    # This is for the direction of the best predictions
+    displayit = label_df_new.sort_values(by='predicted_return', ascending=False).iloc[0:250]
+
+    # make a list of the filenames for the displayit
+    displayit_list = displayit['Filename'].tolist()
+
+    # reset index for displayit
+    displayit = displayit.reset_index(drop=False)
+
+    # delete the unnamed: 0 column
+    displayit = displayit.drop(columns=['Unnamed: 0'])
+
+    displayit['index'] = displayit.index
+
+    # Apply the default Seaborn theme with some enhancements
+    sns.set_theme(style="whitegrid")
+
+    # Sort the data by 'predicted_return' in descending order for correct visualization
+    displayit = displayit.sort_values(by='predicted_return', ascending=False)
+
+    # Create a unique identifier for each row to handle duplicates in 'predicted_return'
+    displayit['unique_predicted_return'] = displayit['predicted_return'].astype(str) + '_' + displayit.groupby('predicted_return').cumcount().astype(str)
+
+    # Create a figure and axis with a specified size
+    fig, ax = plt.subplots(figsize=(20, 10))
+
+    # Define colors based on 'midquote' values
+    colors = ['green' if x > 0 else 'red' for x in displayit['midquote']]
+
+    # Use Seaborn's barplot to plot the data with 'unique_predicted_return' as x and 'midquote' as y
+    # Use the defined colors for each bar
+    barplot = sns.barplot(data=displayit, x='unique_predicted_return', y='midquote', ax=ax, palette=colors)
+
+    # Adding labels and title with improved font sizes
+    ax.set_xlabel('Target Value Prediction', fontsize=14)
+    ax.set_ylabel('Real Return', fontsize=14)
+
+    # Customize x-axis tick labels to show only the first four characters of each ticker
+    ax.set_xticklabels([label.split('_')[0][:5] for label in displayit['unique_predicted_return']])
+
+    # Rotate x-axis labels to avoid overlap and improve readability display only the 2 decimals
+    #plt.xticks(rotation=90, size=10)
+
+    # Customize x-axis tick labels to show only every 5th label
+    plt.xticks(ticks=ax.get_xticks()[::5], labels=[label.get_text() for label in ax.get_xticklabels()[::5]], rotation=90, size=10)
+
+
+    # Add small yellow horizontal lines at the zero line for bars where 'midquote' is zero
+    for i, p in enumerate(barplot.patches):
+        # Check if the corresponding 'midquote' value is zero
+        if displayit.iloc[i]['midquote'] == 0:
+            # Draw a small horizontal yellow line at the zero position
+            ax.hlines(0, p.get_x(), p.get_x() + p.get_width(), colors='yellow', lw=3)  # Adjust linewidth as needed
+
+    # save the picture to a file
+    fig.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/prediction_direction_for_best_long_{time_dict[selected_time]}.png')
+
+    # display the columns with the highest predicted_return
+    displayit = label_df_new.sort_values(by='predicted_return', ascending=True).iloc[0:250]
+    # display the first Arrays in displayit
+    #ds= displayit['Filename'].iloc[0]
+
+    # make a list of the filenames for the displayit
+    displayit_list = displayit['Filename'].tolist()
+
+    #displayit = displayit.sort_values(by='midquote', ascending=False)
+    # reset index for displayit
+    displayit = displayit.reset_index(drop=False)
+
+    # delete the unnamed: 0 column
+    displayit = displayit.drop(columns=['Unnamed: 0'])
+
+
+    displayit['index'] = displayit.index
+
+    # Apply the default Seaborn theme with some enhancements
+    sns.set_theme(style="whitegrid")
+    
+    
+    # Create a unique identifier for each row to handle duplicates in 'predicted_return'
+    displayit['unique_predicted_return'] = displayit['predicted_return'].astype(str) + '_' + displayit.groupby('predicted_return').cumcount().astype(str)
+    
+    # Create a figure and axis with a specified size
+    fig, ax = plt.subplots(figsize=(20, 10))
+    
+    # Define colors based on 'midquote' values
+    colors = ['green' if x > 0 else 'red' for x in displayit['midquote']]
+    
+    # Use Seaborn's barplot to plot the data with 'unique_predicted_return' as x and 'midquote' as y
+    # Use the defined colors for each bar
+    barplot = sns.barplot(data=displayit, x='unique_predicted_return', y='midquote', ax=ax, palette=colors)
+    
+    # Adding labels and title with improved font sizes
+    ax.set_xlabel('Target Value Prediction', fontsize=14)
+    ax.set_ylabel('Real Return', fontsize=14)
+    
+    # Customize x-axis tick labels to show only the first four characters of each ticker
+    ax.set_xticklabels([label.split('_')[0][:5] for label in displayit['unique_predicted_return']])
+    
+    # Rotate x-axis labels to avoid overlap and improve readability display only the 2 decimals
+    plt.xticks(ticks=ax.get_xticks()[::5], labels=[label.get_text() for label in ax.get_xticklabels()[::5]], rotation=90, size=10)
+    
+    # Add small yellow horizontal lines at the zero line for bars where 'midquote' is zero
+    for i, p in enumerate(barplot.patches):
+        # Check if the corresponding 'midquote' value is zero
+        if displayit.iloc[i]['midquote'] == 0:
+            # Draw a small horizontal yellow line at the zero position
+            ax.hlines(0, p.get_x(), p.get_x() + p.get_width(), colors='yellow', lw=3)  # Adjust linewidth as needed
+    
+    fig.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/prediction_direction_for_best_short_{time_dict[selected_time]}.png')
+    
 
     def calculate_combined_for_best(x, y, df):
         pd.options.display.float_format = '{:.7f}'.format
@@ -377,11 +491,13 @@ for z in time_options:
     # Highlight the point with the best Sharpe ratio using a marker
     plt.plot(best_x_positive, best_sharpe_ratio_positive, 'o', color='red', label='Best Sharpe Ratio')
 
-    plt.title(f'Validation of the Optimal Threshold to Maximize Sharpe Ratio for the Long Position for {selected_time} Seconds', fontsize=14)
-    plt.xlabel('Threshold')
-    plt.ylabel('Sharpe Ratio')
+    #plt.title(f'Validation of the Optimal Threshold to Maximize Sharpe Ratio for the Long Position for {selected_time} Seconds', fontsize=14)
+    plt.xlabel('Threshold', fontsize=14)
+    plt.ylabel('Sharpe Ratio', fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
     plt.grid(True)
-    plt.legend()
+    plt.legend(fontsize=12)
       # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/validation_long_sharpe_ratio_optimal_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
     #plt.show()
@@ -416,6 +532,9 @@ for z in time_options:
     import seaborn as sns
     import matplotlib.pyplot as plt
 
+    # make a dictionary that contains the different x-axis values for the different time intervals
+    x_dict = {'0,01': '%H:%M:%S', '0,1': '%H:%M:%S', '0,5': '%H:%M', '1': '%H:%M', '5': '%H:%M', '10': '%H:%M'}
+
     # Assuming high_conf_pos and selected_time are already defined
 
     # Group data by 'Time' and 'correct_prediction' to count occurrences
@@ -425,30 +544,61 @@ for z in time_options:
 
     # Reset index to make 'Time' a column again (useful for seaborn plotting)
     prediction_counts.reset_index(inplace=True)
+    # Convert the Time column to datetime
+    prediction_counts['Time'] = pd.to_datetime(prediction_counts['Time'])
 
-    # Prepare the data for plotting
-    prediction_counts_melted = prediction_counts.melt(id_vars='Time', value_name='Count', var_name='Prediction Outcome')
+    #Create a date range from the first to the last timestamp with 1-second intervals
+    date_range = pd.date_range(start=prediction_counts['Time'].min(), end=prediction_counts['Time'].max(), freq=time_dict[selected_time])
 
-    # Plotting with seaborn
-    plt.figure(figsize=(20, 10))
-    sns.barplot(data=prediction_counts_melted, x='Time', y='Count', hue='Prediction Outcome', palette=['red', 'green'])
+    prediction_counts.set_index('Time', inplace=True)
+    prediction_counts_complete = prediction_counts.reindex(date_range, fill_value=0).reset_index()
+    prediction_counts_complete.rename(columns={'index': 'Time'}, inplace=True)
 
-    plt.title(f'Model Prediction Accuracy Over Time for Long Positions for the {selected_time} Second Model', fontsize=20)
-    plt.xlabel('Time', fontsize=14)
-    plt.ylabel('Number of Predictions', fontsize=14)
+    # make a momving average for the prediction_counts_complete for the incorrect prediction and the correct prediction columns
+    prediction_counts_complete['correct_prediction_moving_average'] = prediction_counts_complete['Correct Prediction'].rolling(window=200).mean()
+    prediction_counts_complete['incorrect_prediction_moving_average'] = prediction_counts_complete['Incorrect Prediction'].rolling(window=200).mean()
 
-    # Customize x-axis labels
-    tick_labels = [label.get_text()[11:] for label in plt.gca().get_xticklabels()]
-    plt.xticks(ticks=plt.gca().get_xticks(), labels=tick_labels, rotation=60, fontsize=10)
+    prediction_counts_complete['sum_of_the_two'] = prediction_counts_complete['Correct Prediction'] + prediction_counts_complete['Incorrect Prediction']
+    # remove the first 200 rows 
+    prediction_counts_complete = prediction_counts_complete[200:]
 
-    # Customization for displaying only every nth label on the x-axis
-    n = 30  # Aim to display every nth x-axis label
-    visible_labels = [label if index % n == 0 else '' for index, label in enumerate(tick_labels)]
-    plt.gca().set_xticklabels(visible_labels)
+    # Set the overall aesthetics
+    sns.set_theme(style="whitegrid")
+
+    plt.figure(figsize=(12, 9))
+
+    # Plot the upper portion (4/5 of the upper half)
+    ax1 = plt.subplot(2, 1, 1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='correct_prediction_moving_average', label='Correct Predictions (MA)', color='seagreen', ax=ax1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='incorrect_prediction_moving_average', label='Incorrect Predictions (MA)', color='salmon', ax=ax1)
+
+    ax1.set_ylabel('Number of Trades (MA=200)', fontsize=16)
+    ax1.tick_params(axis='both', which='major', labelsize=14)
+    ax1.legend(loc='upper left', fontsize=14, title='Prediction Types')
+    # delete the x axis label
+    ax1.set_xlabel('')
+    # delete the x axis ticks
+    #ax1.set_xticks([])
+    # make the vertical grid lines
+    # for the x-axis only display the hour and minute
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax1.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
+
+    ax2 = plt.subplot(2, 1, 2)
+
+    # Assuming prediction_counts_complete DataFrame is available
+    sns.histplot(data=prediction_counts_complete, x='Time', weights='sum_of_the_two', bins=len(prediction_counts_complete), color='dimgray')
+    ax2.set_xlabel('Time', fontsize=14)
+    ax2.set_ylabel('Sum of Predictions', fontsize=16)
+    ax2.tick_params(axis='both', which='major', labelsize=14)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax2.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
 
     plt.tight_layout()
+
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/accuracy_over_time_long_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
+
     #plt.show()
 
 
@@ -459,19 +609,24 @@ for z in time_options:
 
     tickers_counts = high_conf_pos['Ticker'].value_counts().sort_values(ascending=False)
 
+    # Calculate correct and incorrect counts based on 'correct_prediction' column
+    correct_counts = high_conf_pos[high_conf_pos['correct_prediction'] == 1]['Ticker'].value_counts()
+    incorrect_counts = high_conf_pos[high_conf_pos['correct_prediction'] == 0]['Ticker'].value_counts()
+
     # Assuming the second method is the one we're using for average spread
     average_spread_per_ticker = high_conf_pos.groupby('Ticker')['spread'].mean()
     average_spread_per_ticker = average_spread_per_ticker.round(2)
 
     # Making the figure and primary axis for the bar chart
-    fig, ax1 = plt.subplots(figsize=(18, 9))
+    fig, ax1 = plt.subplots(figsize=(20, 10))
 
-    # Plotting the ticker counts as a bar chart
-    ax1.bar(tickers_counts.index, tickers_counts.values, color='blue', label='Ticker Count')
+    # Plotting the correct and incorrect ticker counts as stacked bars
+    ax1.bar(tickers_counts.index, correct_counts.reindex(tickers_counts.index, fill_value=0), color='green', label='Correct Predictions')
+    ax1.bar(tickers_counts.index, incorrect_counts.reindex(tickers_counts.index, fill_value=0), bottom=correct_counts.reindex(tickers_counts.index, fill_value=0), color='red', label='Incorrect Predictions')
     ax1.set_xticks(range(len(tickers_counts)))
     ax1.set_xticklabels(tickers_counts.index, fontsize=8, rotation=90)
-    ax1.set_ylabel('Number of Trades', color='blue', fontsize=14)  # Adjusted fontsize here for y-axis label
-    ax1.tick_params(axis='y', labelcolor='blue')
+    ax1.set_ylabel('Number of Predictions', color='black', fontsize=18)
+    ax1.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Creating a secondary y-axis for the average spreads
     ax2 = ax1.twinx()
@@ -481,28 +636,32 @@ for z in time_options:
     y_values = np.array([average_spread_per_ticker.get(ticker, np.nan) for ticker in tickers_counts.index])
 
     # Plotting the average spreads as red dots on the secondary y-axis
-    ax2.scatter(x_values, y_values, color='red', label='Average Spread')
-    ax2.set_ylabel('Average Spread', color='red', fontsize=14)  # Adjusted fontsize here for y-axis label
-    ax2.tick_params(axis='y', labelcolor='red')
+    ax2.scatter(x_values, y_values, color='black', label='Average Spread (AS)')
+    ax2.set_ylabel('Average Spread', color='black', fontsize=18)
+    ax2.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Calculate and plot the line of best fit for the red dots
     z = np.polyfit(x_values, y_values, 1)
     p = np.poly1d(z)
-    ax2.plot(x_values, p(x_values), "r--", label='Line of Best Fit')  # Using dashed line for the best fit
+    ax2.plot(x_values, p(x_values), color='black', linestyle='--', label='Line of Best Fit for AS')  # Specifying color and line style separately
+
 
     # Adding legends
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper right')
+    ax1.legend(loc='upper left', fontsize=18)
+    ax2.legend(loc='upper right', fontsize=18)
+
+    ax2.grid(False)
+    ax1.grid(False)
 
     ax1.set_xlim(left=-0.5, right=len(tickers_counts)-0.5)
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()
 
     # Setting the title with a specific fontsize
-    plt.title(f'Traded Stocks for Long Strategy with Optimal Threshold of {best_x_positive:.4f} for the {selected_time} Second Model', fontsize=20)
+    #plt.title(f'Traded Stocks for Long Strategy with Optimal Threshold of {best_x_positive:.4f} for the {selected_time} Second Model', fontsize=20)
+
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/traded_stocks_long_average_spread_and_ticker_count_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
     #plt.show()
-
 
     # calculate the mean return for each ticker
     mean_return_per_ticker = high_conf_pos.groupby('Ticker')['midquote'].mean()
@@ -546,7 +705,7 @@ for z in time_options:
     # Plot this in a bar chart
     plt.figure(figsize=(20, 10))
     mean_return_per_category.plot(kind='bar', color='green')
-    plt.title(f'Mean Return for Each Category for the {selected_time} Second Model', fontsize=20)
+    #plt.title(f'Mean Return for Each Category for the {selected_time} Second Model', fontsize=20)
     plt.xlabel('Category', fontsize=14)
     plt.ylabel('Mean Return', fontsize=14)
     plt.xticks(fontsize=8, rotation=45)
@@ -560,7 +719,7 @@ for z in time_options:
     # and plot this in a bar chart
     plt.figure(figsize=(20, 10))
     mean_return_per_ticker.plot(kind='bar', color='blue')
-    plt.title(f'Mean Return for Each Ticker for the {selected_time} Second Model', fontsize=20)
+    #plt.title(f'Mean Return for Each Ticker for the {selected_time} Second Model', fontsize=20)
     plt.xlabel('Ticker', fontsize=14)
     plt.ylabel('Mean Return', fontsize=14)  
     plt.xticks(fontsize=8, rotation=90)
@@ -610,7 +769,7 @@ for z in time_options:
     # Highlight the point with the best Sharpe ratio using a marker
     plt.plot(best_y_negative, best_sharpe_ratio_negative, 'o', color='red', label='Best Sharpe Ratio')
 
-    plt.title('Sharpe Ratio Optimization for Short Position')  # Updated title to be more descriptive
+    #plt.title('Sharpe Ratio Optimization for Short Position')  # Updated title to be more descriptive
     plt.xlabel('Threshold')
     plt.ylabel('Sharpe Ratio')
     plt.grid(True)
@@ -647,8 +806,10 @@ for z in time_options:
     # save the overall accuracy to the excel_df
     excel_df.loc['Overall accuracy for test data for short after optimal threshold', selected_time] = overall_accuracy
 
-    import seaborn as sns
-    import matplotlib.pyplot as plt
+    # make a dictionary that contains the different x-axis values for the different time intervals
+    x_dict = {'0,01': '%H:%M:%S', '0,1': '%H:%M:%S', '0,5': '%H:%M', '1': '%H:%M', '5': '%H:%M', '10': '%H:%M'}
+
+    # Assuming high_conf_neg and selected_time are already defined
 
     # Group data by 'Time' and 'correct_prediction' to count occurrences
     prediction_counts = high_conf_neg.groupby(['Time', 'correct_prediction']).size().unstack(fill_value=0)
@@ -657,52 +818,88 @@ for z in time_options:
 
     # Reset index to make 'Time' a column again (useful for seaborn plotting)
     prediction_counts.reset_index(inplace=True)
+    # Convert the Time column to datetime
+    prediction_counts['Time'] = pd.to_datetime(prediction_counts['Time'])
 
-    # Prepare the data for plotting
-    prediction_counts_melted = prediction_counts.melt(id_vars='Time', value_name='Count', var_name='Prediction Outcome')
+    #Create a date range from the first to the last timestamp with 1-second intervals
+    date_range = pd.date_range(start=prediction_counts['Time'].min(), end=prediction_counts['Time'].max(), freq=time_dict[selected_time])
 
-    # Plotting with seaborn
-    plt.figure(figsize=(20, 10))  # Adjusted to match the template's dimensions
-    sns.barplot(data=prediction_counts_melted, x='Time', y='Count', hue='Prediction Outcome', palette=['red', 'green'])
+    prediction_counts.set_index('Time', inplace=True)
+    prediction_counts_complete = prediction_counts.reindex(date_range, fill_value=0).reset_index()
+    prediction_counts_complete.rename(columns={'index': 'Time'}, inplace=True)
 
-    plt.title(f'Model Prediction Accuracy Over Time for Short Positions for the {selected_time} Second Model', fontsize=20)  # Title adjusted to include focus
-    plt.xlabel('Time', fontsize=14)
-    plt.ylabel('Number of Predictions', fontsize=14)
+    # make a momving average for the prediction_counts_complete for the incorrect prediction and the correct prediction columns
+    prediction_counts_complete['correct_prediction_moving_average'] = prediction_counts_complete['Correct Prediction'].rolling(window=200).mean()
+    prediction_counts_complete['incorrect_prediction_moving_average'] = prediction_counts_complete['Incorrect Prediction'].rolling(window=200).mean()
 
-    # Customize x-axis labels
-    tick_labels = [label.get_text()[11:] for label in plt.gca().get_xticklabels()]
-    plt.xticks(ticks=plt.gca().get_xticks(), labels=tick_labels, rotation=60, fontsize=10)
+    prediction_counts_complete['sum_of_the_two'] = prediction_counts_complete['Correct Prediction'] + prediction_counts_complete['Incorrect Prediction']
+    # remove the first 200 rows 
+    prediction_counts_complete = prediction_counts_complete[200:]
 
-    # Customization for displaying only every nth label on the x-axis
-    n = 40  # Adjusted as per your specification
-    visible_labels = [label if index % n == 0 else '' for index, label in enumerate(tick_labels)]
-    plt.gca().set_xticklabels(visible_labels)
+    # Set the overall aesthetics
+    sns.set_theme(style="whitegrid")
+
+    plt.figure(figsize=(12, 9))
+
+    # Plot the upper portion (4/5 of the upper half)
+    ax1 = plt.subplot(2, 1, 1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='correct_prediction_moving_average', label='Correct Predictions (MA)', color='seagreen', ax=ax1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='incorrect_prediction_moving_average', label='Incorrect Predictions (MA)', color='salmon', ax=ax1)
+
+    ax1.set_ylabel('Number of Trades (MA=200)', fontsize=16)
+    ax1.tick_params(axis='both', which='major', labelsize=14)
+    ax1.legend(loc='upper left', fontsize=14, title='Prediction Types')
+    # delete the x axis label
+    ax1.set_xlabel('')
+    # delete the x axis ticks
+    #ax1.set_xticks([])
+    # make the vertical grid lines
+    # for the x-axis only display the hour and minute
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax1.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
+
+    ax2 = plt.subplot(2, 1, 2)
+
+    # Assuming prediction_counts_complete DataFrame is available
+    sns.histplot(data=prediction_counts_complete, x='Time', weights='sum_of_the_two', bins=len(prediction_counts_complete), color='dimgray')
+    ax2.set_xlabel('Time', fontsize=14)
+    ax2.set_ylabel('Sum of Predictions', fontsize=16)
+    ax2.tick_params(axis='both', which='major', labelsize=14)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax2.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
 
     plt.tight_layout()
+
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/accuracy_over_time_short_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
 
-    #plt.show()
+
 
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Assuming `high_conf_neg`, `test_df`, `best_y_negative`, and `selected_time` are defined
+    # Assuming `high_conf_neg`, `test_df`, `best_x_positive`, and `selected_time` are defined
 
-    # Preparing ticker counts and average spreads as before, focusing on the 'high_conf_neg' data
     tickers_counts = high_conf_neg['Ticker'].value_counts().sort_values(ascending=False)
+
+    # Calculate correct and incorrect counts based on 'correct_prediction' column
+    correct_counts = high_conf_neg[high_conf_neg['correct_prediction'] == 1]['Ticker'].value_counts()
+    incorrect_counts = high_conf_neg[high_conf_neg['correct_prediction'] == 0]['Ticker'].value_counts()
+
+    # Assuming the second method is the one we're using for average spread
     average_spread_per_ticker = high_conf_neg.groupby('Ticker')['spread'].mean()
     average_spread_per_ticker = average_spread_per_ticker.round(2)
 
     # Making the figure and primary axis for the bar chart
-    fig, ax1 = plt.subplots(figsize=(18, 9))
+    fig, ax1 = plt.subplots(figsize=(20, 10))
 
-    # Plotting the ticker counts as a bar chart
-    ax1.bar(tickers_counts.index, tickers_counts.values, color='blue', label='Ticker Count')
+    # Plotting the correct and incorrect ticker counts as stacked bars
+    ax1.bar(tickers_counts.index, correct_counts.reindex(tickers_counts.index, fill_value=0), color='green', label='Correct Predictions')
+    ax1.bar(tickers_counts.index, incorrect_counts.reindex(tickers_counts.index, fill_value=0), bottom=correct_counts.reindex(tickers_counts.index, fill_value=0), color='red', label='Incorrect Predictions')
     ax1.set_xticks(range(len(tickers_counts)))
     ax1.set_xticklabels(tickers_counts.index, fontsize=8, rotation=90)
-    ax1.set_ylabel('Number of Trades', color='blue', fontsize=14)  # Matching the template for consistency
-    ax1.tick_params(axis='y', labelcolor='blue')
+    ax1.set_ylabel('Number of Predictions', color='black', fontsize=18)
+    ax1.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Creating a secondary y-axis for the average spreads
     ax2 = ax1.twinx()
@@ -712,33 +909,38 @@ for z in time_options:
     y_values = np.array([average_spread_per_ticker.get(ticker, np.nan) for ticker in tickers_counts.index])
 
     # Plotting the average spreads as red dots on the secondary y-axis
-    ax2.scatter(x_values, y_values, color='red', label='Average Spread')
-    ax2.set_ylabel('Average Spread', color='red', fontsize=14)  # Adjusted for consistency
-    ax2.tick_params(axis='y', labelcolor='red')
+    ax2.scatter(x_values, y_values, color='black', label='Average Spread (AS)')
+    ax2.set_ylabel('Average Spread', color='black', fontsize=18)
+    ax2.tick_params(axis='y', labelcolor='black', labelsize=16)
 
     # Calculate and plot the line of best fit for the red dots
     z = np.polyfit(x_values, y_values, 1)
     p = np.poly1d(z)
-    ax2.plot(x_values, p(x_values), "r--", label='Line of Best Fit')  # Using dashed line for the best fit
+    ax2.plot(x_values, p(x_values), color='black', linestyle='--', label='Line of Best Fit for AS')  # Specifying color and line style separately
+
 
     # Adding legends
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper right')
+    ax1.legend(loc='upper left', fontsize=18)
+    ax2.legend(loc='upper right', fontsize=18)
 
-    # After plotting your data but before calling #plt.show()
+    ax2.grid(False)
+    ax1.grid(False)
+
     ax1.set_xlim(left=-0.5, right=len(tickers_counts)-0.5)
 
+    fig.tight_layout()
 
-    fig.tight_layout()  # Adjust layout to make room
-
-    # Setting the title with a specific fontsize and updated context for short positions
-    plt.title(f'Traded Stocks for Short Strategy with Optimal Threshold of {best_y_negative:.4f} for the {selected_time} Second Model', fontsize=20)
-
+    # Setting the title with a specific fontsize
+    #plt.title(f'Traded Stocks for short Strategy with Optimal Threshold of {best_x_positive:.4f} for the {selected_time} Second Model', fontsize=20)
 
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/traded_stocks_short_average_spread_and_ticker_count_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
-    #plt.show()
 
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Assuming calculate_combined_for_best function and val_df are defined elsewhere
 
     # Grid search setup
     best_sharpe_ratio = -np.inf
@@ -748,8 +950,7 @@ for z in time_options:
     w = 1.5 # in percent  
     percent_count = int(len(val_df) * (w/100))
 
-
-    # find the lowest predicted values in val_df
+    # Find the lowest predicted values in val_df
     min_val = val_df['predicted_return'].nsmallest(percent_count).iloc[-1]
     max_val = val_df['predicted_return'].nlargest(percent_count).iloc[-1]
 
@@ -779,16 +980,25 @@ for z in time_options:
     # Print the best Sharpe Ratio and corresponding x, y values
     print(f"Best Sharpe Ratio: {best_sharpe_ratio:.4f}, Best x: {best_x:.4f}, Best y: {best_y:.4f}")
 
+    # Close any existing plots
+    plt.close('all')
+
     # Plotting the heatmap of Sharpe ratios
     plt.figure(figsize=(10, 8))
-    plt.imshow(metric_grid, cmap='viridis', origin='lower', extent=[y_values.min(), y_values.max(), x_values.min(), x_values.max()], aspect='auto')
-    plt.colorbar(label='Sharpe Ratio')
-    plt.xlabel('Threshold wrt. the Prediction for Short Position')
-    plt.ylabel('Threshold wrt. the Prediction for Long Position')
-    plt.title(f'Heatmap of Sharpe Ratio Across Theresholds Combinations for {selected_time} Seconds')
+    cax = plt.imshow(metric_grid, cmap='viridis', origin='lower', extent=[y_values.min(), y_values.max(), x_values.min(), x_values.max()], aspect='auto')
+    cbar = plt.colorbar(cax, label='Sharpe Ratio')
+    cbar.ax.set_ylabel('Sharpe Ratio', fontsize=16)  # Set font size for the colorbar label
+    cbar.ax.tick_params(labelsize=12) 
+    plt.xlabel('Lower Threshold for the Short Position', fontsize=16)
+    plt.ylabel('Upper Threshold for the Long Position', fontsize=16)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.grid(False)
+    #plt.title(f'Heatmap of Sharpe Ratio Across Theresholds Combinations for {selected_time} Seconds')
     # save picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/Validation_for_combined_sharpe_ratio_optimal_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
-    #plt.show()
+
+
 
     # save the best_sharpe_ratio and best_x and best_y to the excel_df
     excel_df.loc['Best Sharpe Ratio for validation for combined', selected_time] = best_sharpe_ratio
@@ -879,10 +1089,10 @@ for z in time_options:
     excel_df.loc['Overall accuracy for test data for combined after optimal threshold (long and short)', selected_time] = overall_accuracy
 
 
-    import seaborn as sns
-    import matplotlib.pyplot as plt
+    # make a dictionary that contains the different x-axis values for the different time intervals
+    x_dict = {'0,01': '%H:%M:%S', '0,1': '%H:%M:%S', '0,5': '%H:%M', '1': '%H:%M', '5': '%H:%M', '10': '%H:%M'}
 
-    # Assume 'combined_df' is your new DataFrame with data on 'Time' and 'correct_prediction'
+    # Assuming combined_df and selected_time are already defined
 
     # Group data by 'Time' and 'correct_prediction' to count occurrences
     prediction_counts = combined_df.groupby(['Time', 'correct_prediction']).size().unstack(fill_value=0)
@@ -891,32 +1101,60 @@ for z in time_options:
 
     # Reset index to make 'Time' a column again (useful for seaborn plotting)
     prediction_counts.reset_index(inplace=True)
+    # Convert the Time column to datetime
+    prediction_counts['Time'] = pd.to_datetime(prediction_counts['Time'])
 
-    # Prepare the data for plotting
-    prediction_counts_melted = prediction_counts.melt(id_vars='Time', value_name='Count', var_name='Prediction Outcome')
+    #Create a date range from the first to the last timestamp with 1-second intervals
+    date_range = pd.date_range(start=prediction_counts['Time'].min(), end=prediction_counts['Time'].max(), freq=time_dict[selected_time])
 
-    # Plotting with seaborn
-    plt.figure(figsize=(20, 10))  # Keep consistent figure dimensions
-    sns.barplot(data=prediction_counts_melted, x='Time', y='Count', hue='Prediction Outcome', palette=['red', 'green'])
+    prediction_counts.set_index('Time', inplace=True)
+    prediction_counts_complete = prediction_counts.reindex(date_range, fill_value=0).reset_index()
+    prediction_counts_complete.rename(columns={'index': 'Time'}, inplace=True)
 
-    # Title, labels, and font sizes adjusted for consistency
-    plt.title(f'Model Prediction Accuracy Over Time for {selected_time} Seconds ', fontsize=20)  # Update title to fit new analysis context
-    plt.xlabel('Time', fontsize=14)
-    plt.ylabel('Number of Predictions', fontsize=14)
+    # make a momving average for the prediction_counts_complete for the incorrect prediction and the correct prediction columns
+    prediction_counts_complete['correct_prediction_moving_average'] = prediction_counts_complete['Correct Prediction'].rolling(window=200).mean()
+    prediction_counts_complete['incorrect_prediction_moving_average'] = prediction_counts_complete['Incorrect Prediction'].rolling(window=200).mean()
 
-    # Customize x-axis labels, rotation, and font size for consistency
-    tick_labels = [label.get_text()[11:] for label in plt.gca().get_xticklabels()]# Adapt label processing as needed
-    plt.xticks(ticks=plt.gca().get_xticks(), labels=tick_labels, rotation=60, fontsize=10)
+    prediction_counts_complete['sum_of_the_two'] = prediction_counts_complete['Correct Prediction'] + prediction_counts_complete['Incorrect Prediction']
+    # remove the first 200 rows 
+    prediction_counts_complete = prediction_counts_complete[200:]
 
-    # Customization for displaying only every nth label on the x-axis
-    n = 40  # Adjust n as per new requirements
-    visible_labels = [label if index % n == 0 else '' for index, label in enumerate(tick_labels)]
-    plt.gca().set_xticklabels(visible_labels)
+    # Set the overall aesthetics
+    sns.set_theme(style="whitegrid")
+
+    plt.figure(figsize=(12, 9))
+
+    # Plot the upper portion (4/5 of the upper half)
+    ax1 = plt.subplot(2, 1, 1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='correct_prediction_moving_average', label='Correct Predictions (MA)', color='seagreen', ax=ax1)
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='incorrect_prediction_moving_average', label='Incorrect Predictions (MA)', color='salmon', ax=ax1)
+
+    ax1.set_ylabel('Number of Trades (MA=200)', fontsize=16)
+    ax1.tick_params(axis='both', which='major', labelsize=14)
+    ax1.legend(loc='upper left', fontsize=14, title='Prediction Types')
+    # delete the x axis label
+    ax1.set_xlabel('')
+    # delete the x axis ticks
+    #ax1.set_xticks([])
+    # make the vertical grid lines
+    # for the x-axis only display the hour and minute
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax1.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
+
+    ax2 = plt.subplot(2, 1, 2)
+
+    # Assuming prediction_counts_complete DataFrame is available
+    sns.histplot(data=prediction_counts_complete, x='Time', weights='sum_of_the_two', bins=len(prediction_counts_complete), color='dimgray')
+    ax2.set_xlabel('Time', fontsize=14)
+    ax2.set_ylabel('Sum of Predictions', fontsize=16)
+    ax2.tick_params(axis='both', which='major', labelsize=14)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
+    ax2.grid(True, linestyle='--', linewidth=0.5)  # lighter grid lines
 
     plt.tight_layout()
+
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/accuracy_over_time_combined_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
-    #plt.show()
 
 
 
@@ -924,72 +1162,75 @@ for z in time_options:
     import numpy as np
     import pandas as pd
 
-    # Preparations as before
+    # Assuming combined_df, best_x, best_y, selected_time, and time_dict are defined
+
+    # Count the number of predictions above and below the thresholds
     above_threshold_counts = combined_df[combined_df['predicted_return'] >= best_x].groupby('Ticker').size()
     below_threshold_counts = combined_df[combined_df['predicted_return'] <= best_y].groupby('Ticker').size()
+
+    # Calculate the average spread above and below the thresholds
     average_spread_above = combined_df[combined_df['predicted_return'] >= best_x].groupby('Ticker')['spread'].mean()
     average_spread_below = combined_df[combined_df['predicted_return'] <= best_y].groupby('Ticker')['spread'].mean()
 
+    # Total counts and sorted tickers
     tickers = combined_df['Ticker'].unique()
-    above_threshold_counts = above_threshold_counts.reindex(tickers, fill_value=0)
-    below_threshold_counts = below_threshold_counts.reindex(tickers, fill_value=0)
-    average_spread_above = average_spread_above.reindex(tickers, fill_value=np.nan)
-    average_spread_below = average_spread_below.reindex(tickers, fill_value=np.nan)
-
-    total_counts = above_threshold_counts + below_threshold_counts
+    total_counts = above_threshold_counts.add(below_threshold_counts, fill_value=0)
     sorted_tickers = total_counts.sort_values(ascending=False).index
 
-    above_threshold_counts = above_threshold_counts.reindex(sorted_tickers)
-    below_threshold_counts = below_threshold_counts.reindex(sorted_tickers)
-    average_spread_above = average_spread_above.reindex(sorted_tickers)
-    average_spread_below = average_spread_below.reindex(sorted_tickers)
+    # Reindexing to ensure all data aligns properly
+    above_threshold_counts = above_threshold_counts.reindex(sorted_tickers, fill_value=0)
+    below_threshold_counts = below_threshold_counts.reindex(sorted_tickers, fill_value=0)
+    average_spread_above = average_spread_above.reindex(sorted_tickers, fill_value=np.nan)
+    average_spread_below = average_spread_below.reindex(sorted_tickers, fill_value=np.nan)
 
-    # Making the figure and axes for the bar chart
+    # Creating the figure and primary axis for the bar chart
     fig, ax1 = plt.subplots(figsize=(20, 10))
     ind = np.arange(len(sorted_tickers))
 
-    # Stacked bar chart
-    ax1.bar(ind, below_threshold_counts.values, label=f'Short Stategy for Predictions below the Threshold of {best_y:.4f} (LA)', color='red')
-    ax1.bar(ind, above_threshold_counts.values, bottom=below_threshold_counts.values, label=f'Long Strategy for Predictions above the Threshold of {best_x:.4f} (LA)', color='green')
+    # Plotting the bar charts for above and below threshold predictions
+    ax1.bar(ind, below_threshold_counts, color='red', label='Short Strategy (Predictions below {:.4f})'.format(best_y))
+    ax1.bar(ind, above_threshold_counts, bottom=below_threshold_counts, color='green', label='Long Strategy (Predictions above {:.4f})'.format(best_x))
 
-    # Secondary axis for average spreads
+    # Creating a secondary y-axis for the average spreads
     ax2 = ax1.twinx()
 
-    # Calculate lines of best fit
-    z_above = np.polyfit(ind[~np.isnan(average_spread_above)], average_spread_above.dropna(), 1)
+    # Scatter plots for the average spreads
+    ax2.scatter(ind, average_spread_below, color='darkred', alpha=0.5, label='Average Spread Below Threshold')
+    ax2.scatter(ind, average_spread_above, color='darkgreen', alpha=0.5, label='Average Spread Above Threshold')
+
+    # Calculating and plotting lines of best fit for average spreads
     z_below = np.polyfit(ind[~np.isnan(average_spread_below)], average_spread_below.dropna(), 1)
-    p_above = np.poly1d(z_above)
     p_below = np.poly1d(z_below)
-
-    # Scatter plots for average spreads with transparency and same shape
-    ax2.scatter(ind, average_spread_below, color='darkred', alpha=0.5, label=f'Average Spread for Short Strategy (Threshold of {best_y:.3f}) (RA)', marker='o')
-    ax2.scatter(ind, average_spread_above, color='darkgreen', alpha=0.5, label=f'Average Spread Above Threshold (Threshold of {best_x:.3f}) (RA)', marker='o')
-
-    # Plotting lines of best fit
     ax2.plot(ind, p_below(ind), 'r--', alpha=0.75)
+
+    z_above = np.polyfit(ind[~np.isnan(average_spread_above)], average_spread_above.dropna(), 1)
+    p_above = np.poly1d(z_above)
     ax2.plot(ind, p_above(ind), 'g--', alpha=0.75)
 
-    # Labeling and formatting
+    # Setting labels, ticks, legends, and formatting
     ax1.set_xticks(ind)
-    ax1.set_xticklabels(sorted_tickers, rotation='vertical', fontsize=8)
-    ax1.set_ylabel('Number of Trades')
-    ax2.set_ylabel('Average Spread')
-    ax1.set_title(f'Number of Trades and Average Spread per Ticker by Threshold for the {selected_time} Second Model (Threshold for Short: {best_y:.3f} Seconds) (Threshold for Long: {best_x:.3f} Seconds)')
+    ax1.set_xticklabels(sorted_tickers, rotation=90, fontsize=8)
+    ax1.set_ylabel('Number of Predictions', fontsize=18)
+    ax2.set_ylabel('Average Spread', fontsize=18)
 
-    # After plotting your data but before calling #plt.show()
+    # Adjusting tick label size
+    #ax1.tick_params(axis='x', labelsize=8)  # Set fontsize for x-axis ticks
+    ax1.tick_params(axis='y', labelsize=14)  # Set fontsize for y-axis ticks
+    ax2.tick_params(axis='y', labelsize=14)  # Set fontsize for secondary y-axis ticks
+
+    ax1.legend(loc='upper left', fontsize=18)
+    ax2.legend(loc='upper right', fontsize=18)
+
+    ax1.grid(False)
+    ax2.grid(False)
     ax1.set_xlim(left=-0.5, right=len(sorted_tickers)-0.5)
 
-    # Adjusting the fontsize in the set_xticklabels method
-    ax1.set_xticklabels(sorted_tickers, rotation='vertical', fontsize=6)  # Reduced fontsize for smaller labels
+    fig.tight_layout()
+
+    # Save the picture to a file
+    plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/number_of_trades_and_average_spread_per_ticker_{time_dict[selected_time]}.png', dpi=300, bbox_inches='tight')
 
 
-    # Legend
-    handles1, labels1 = ax1.get_legend_handles_labels()
-    handles2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper right')
-    # save the picture to a file
-    plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/number_of_trades_and_average_spread_per_ticker_{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
-    #plt.show()
 
     pd.options.display.float_format = '{:.7f}'.format
 
@@ -1502,7 +1743,7 @@ for z in time_options:
     plt.colorbar(label='Return')
     plt.xlabel('Threshold wrt. the Prediction for Short Position')
     plt.ylabel('Threshold wrt. the Prediction for Long Position')
-    plt.title(f'Heatmap of Returns Across Thresholds Combinations for {selected_time} Seconds')
+    #plt.title(f'Heatmap of Returns Across Thresholds Combinations for {selected_time} Seconds')
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/heatmap_returns_based_on_optimization_for_return_combined{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
     #plt.show()
@@ -1753,14 +1994,14 @@ for z in time_options:
     fpr, tpr, thresholds = roc_curve(test_df['midquote_target'], test_df['predicted_return'])
 
     # Plot ROC curve
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(8, 8))
     plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % auc_roc)
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic')
+    #plt.title('Receiver Operating Characteristic')
     plt.legend(loc="lower right")
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/ROC_curve{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
@@ -1792,12 +2033,12 @@ for z in time_options:
     # Plotting the Confusion Matrix
     plt.figure(figsize=(8, 8))
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap='Blues', square=True,
-                xticklabels=['Negative', 'Positive'], yticklabels=['Negative', 'Positive'],annot_kws={"size": 16})
+                xticklabels=['0', '1'], yticklabels=['0', '1'],annot_kws={"size": 16})
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
-    plt.xlabel('Predicted label')
-    plt.ylabel('True label')
-    plt.title(f'Confusion Matrix for the {selected_time} Seconds Model', fontsize=16)
+    plt.xlabel('Predicted Label', fontsize=16)
+    plt.ylabel('True Label', fontsize=16)
+    #plt.title(f'Confusion Matrix for the {selected_time} Seconds Model', fontsize=16)
     
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/confusion_matrix{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
@@ -1929,9 +2170,11 @@ for z in time_options:
     # Visualization
     plt.figure(figsize=(20, 10))
     plt.plot(results_df['x'], results_df['Sharpe Ratio'], marker='o', linestyle='-')
-    plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Combined Strategy for the {selected_time} Seconds Model', fontsize=10)
-    plt.xlabel('Number of Selected Stocks')
-    plt.ylabel('Sharpe Ratio')
+    #plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Combined Strategy for the {selected_time} Seconds Model', fontsize=10)
+    plt.xlabel('Number of Selected Stocks', fontsize=16)
+    plt.ylabel('Sharpe Ratio', fontsize=16)
+    plt.xticks(size=14)
+    plt.yticks(size=14)
     plt.grid(True)
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/validation_for_strategy_with_x_stocks_each_time_on_both_sides_sharpe_ratio{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
@@ -1971,12 +2214,14 @@ for z in time_options:
     optimal_x_positive = results_df.loc[results_df['Sharpe Ratio'].idxmax()]
 
     print(f"Optimal x value: {optimal_x_positive['x']} with Sharpe Ratio: {optimal_x_positive['Sharpe Ratio']}")
-    plt.figure(figsize=(10, 6))
-    # Visualization
-    plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Long Strategy for the {selected_time} Seconds Model', fontsize=10)
+    plt.figure(figsize=(20, 10))
     plt.plot(results_df['x'], results_df['Sharpe Ratio'], marker='o', linestyle='-')
-    plt.ylabel('Sharpe Ratio')
-    plt.xlabel('Number of Selected Stocks (x)')
+    #plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Long Strategy for the {selected_time} Seconds Model', fontsize=10)
+    plt.xlabel('Number of Selected Stocks', fontsize=16)
+    plt.ylabel('Sharpe Ratio', fontsize=16)
+    plt.xticks(size=14)
+    plt.yticks(size=14)
+    plt.grid(True)
 
     plt.grid(True)
     # save the picture to a file
@@ -2025,13 +2270,13 @@ for z in time_options:
     optimal_x_negative = results_df.loc[results_df['Sharpe Ratio'].idxmax()]
 
     print(f"Optimal x value: {optimal_x_negative['x']} with Sharpe Ratio: {optimal_x_negative['Sharpe Ratio']}")
-    plt.figure(figsize=(10, 6))
-    # Visualization
-    plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Short Strategy for the {selected_time} Seconds Model', fontsize=10)
+    plt.figure(figsize=(20, 10))
     plt.plot(results_df['x'], results_df['Sharpe Ratio'], marker='o', linestyle='-')
-    plt.ylabel('Sharpe Ratio')
-    plt.xlabel('Number of Selected Stocks (x)')
-
+    #plt.title(f'Validation of Sharpe Ratio by Number of Selected Stocks for the Long Strategy for the {selected_time} Seconds Model', fontsize=10)
+    plt.xlabel('Number of Selected Stocks', fontsize=16)
+    plt.ylabel('Sharpe Ratio', fontsize=16)
+    plt.xticks(size=14)
+    plt.yticks(size=14)
     plt.grid(True)
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/validation_for_short_strategy_only_with_x_stocks_each_time_sharpe_ratio{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
@@ -2101,123 +2346,138 @@ for z in time_options:
 
     import matplotlib.pyplot as plt
 
-    # Assuming 'df_tottenham' is your DataFrame with data on 'Time' and 'correct_prediction'
-    # And assuming 'selected_time' is defined
+    import matplotlib.dates as mdates
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    # Assuming df_tottenham and selected_time are already defined
+    # Assuming time_dict is defined
 
     # Group data by 'Time' and 'correct_prediction' to count occurrences
-    prediction_counts = df_tottenham.groupby(['Time', 'correct_prediction']).size().unstack(fill_value=0)# Ensure columns are correctly ordered for stacking: first False (Incorrect), then True (Correct)
+    prediction_counts = df_tottenham.groupby(['Time', 'correct_prediction']).size().unstack(fill_value=0)
 
+    prediction_counts.columns = prediction_counts.columns.map({True: 'Correct Prediction', False: 'Incorrect Prediction'})
 
-    if not prediction_counts.columns.is_monotonic_increasing:
-        prediction_counts = prediction_counts.reindex(columns=[False, True])
-
-    # Reset index to make 'Time' a column again (useful for plotting)
+    # Reset index to make 'Time' a column again (useful for seaborn plotting)
     prediction_counts.reset_index(inplace=True)
+    # Convert the Time column to datetime
+    prediction_counts['Time'] = pd.to_datetime(prediction_counts['Time'])
 
-    # Plotting
-    plt.figure(figsize=(20, 10))  # Consistent figure dimensions
-    bottom = np.zeros(len(prediction_counts))
-    # Stacked bar plot
+    # Create a date range from the first to the last timestamp with 1-second intervals
+    date_range = pd.date_range(start=prediction_counts['Time'].min(), end=prediction_counts['Time'].max(), freq=time_dict[selected_time])
 
-    colors = ['red', 'green']  # Incorrect (False) in red, Correct (True) in green
-    labels = ['Incorrect Prediction', 'Correct Prediction']  # Consistent with the seaborn templatefor i, col in enumerate(prediction_counts.columns[1:]):  # Skip the first column ('Time')
+    prediction_counts.set_index('Time', inplace=True)
+    prediction_counts_complete = prediction_counts.reindex(date_range, fill_value=0).reset_index()
+    prediction_counts_complete.rename(columns={'index': 'Time'}, inplace=True)
 
+    # Make a moving average for the prediction_counts_complete for the incorrect and correct prediction columns
+    prediction_counts_complete['correct_prediction_moving_average'] = prediction_counts_complete['Correct Prediction'].rolling(window=200).mean()
+    prediction_counts_complete['incorrect_prediction_moving_average'] = prediction_counts_complete['Incorrect Prediction'].rolling(window=200).mean()
 
-    for i, col in enumerate(prediction_counts.columns[1:]):  # Skip the first column ('Time')
-        plt.bar(prediction_counts['Time'], prediction_counts[col], bottom=bottom, label=labels[i], color=colors[i])
-        bottom += prediction_counts[col].values
+    # Remove the first 200 rows 
+    prediction_counts_complete = prediction_counts_complete[200:]
 
+    # Set the overall aesthetics
+    sns.set_theme(style="whitegrid")
 
-    plt.xlabel('Time', fontsize=14)
-    plt.ylabel('Number of Predictions', fontsize=14)# Customize x-axis labels to display only every nth label for readability
+    plt.figure(figsize=(20, 10))
 
-    all_labels = prediction_counts['Time'].astype(str)
-    n = 40  # Adjust n as per new requirements
+    # Plot the time series for moving averages
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='correct_prediction_moving_average', label='Correct Predictions (MA)', color='seagreen')
+    sns.lineplot(data=prediction_counts_complete, x='Time', y='incorrect_prediction_moving_average', label='Incorrect Predictions (MA)', color='salmon')
 
-    tick_labels = [label.get_text()[11:] for label in plt.gca().get_xticklabels()]# Adapt label processing as needed
-    plt.xticks(ticks=range(len(all_labels)), labels=visible_labels, rotation=60, fontsize=10)
+    plt.ylabel('Number of Trades (MA=200)', fontsize=16)
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    plt.legend(loc='upper left', fontsize=14, title='Prediction Types')
+    plt.xlabel('')  # Remove x-axis label
+    plt.grid(True, linestyle='--', linewidth=0.5)  # Lighter grid lines
 
-    plt.legend(title='Prediction Outcome')
+    # Formatter for the x-axis based on selected time intervals
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter(str(x_dict[selected_time])))
 
     plt.tight_layout()
-    # save the picture to a file
+
+    # Save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/accuracy_over_time_combined_for_strategy_with_fixed_number_of_trades_per_time_on_both_sides{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
+
+
+
     #plt.show()
 
+    import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
 
-    #best_x = 0.5
-    #best_y = 0.5# Preparations as before
+    # Assuming df_tottenham, best_x, best_y, selected_time, and time_dict are defined
+    best_x = 0.5
+    best_y = 0.5
 
-    below_threshold_counts = df_tottenham[df_tottenham['predicted_return'] <= best_y].groupby('Ticker').size()
+    # Count the number of predictions above and below the thresholds
     above_threshold_counts = df_tottenham[df_tottenham['predicted_return'] >= best_x].groupby('Ticker').size()
+    below_threshold_counts = df_tottenham[df_tottenham['predicted_return'] <= best_y].groupby('Ticker').size()
 
+    # Calculate the average spread above and below the thresholds
     average_spread_above = df_tottenham[df_tottenham['predicted_return'] >= best_x].groupby('Ticker')['spread'].mean()
     average_spread_below = df_tottenham[df_tottenham['predicted_return'] <= best_y].groupby('Ticker')['spread'].mean()
+
+    # Total counts and sorted tickers
     tickers = df_tottenham['Ticker'].unique()
-
-    below_threshold_counts = below_threshold_counts.reindex(tickers, fill_value=0)
-    above_threshold_counts = above_threshold_counts.reindex(tickers, fill_value=0)
-
-    average_spread_above = average_spread_above.reindex(tickers, fill_value=np.nan)
-    average_spread_below = average_spread_below.reindex(tickers, fill_value=np.nan)
-
-    total_counts = above_threshold_counts + below_threshold_counts
+    total_counts = above_threshold_counts.add(below_threshold_counts, fill_value=0)
     sorted_tickers = total_counts.sort_values(ascending=False).index
-    below_threshold_counts = below_threshold_counts.reindex(sorted_tickers)
-    above_threshold_counts = above_threshold_counts.reindex(sorted_tickers)
 
-    average_spread_above = average_spread_above.reindex(sorted_tickers)
-    average_spread_below = average_spread_below.reindex(sorted_tickers)# Making the figure and axes for the bar chart
+    # Reindexing to ensure all data aligns properly
+    above_threshold_counts = above_threshold_counts.reindex(sorted_tickers, fill_value=0)
+    below_threshold_counts = below_threshold_counts.reindex(sorted_tickers, fill_value=0)
+    average_spread_above = average_spread_above.reindex(sorted_tickers, fill_value=np.nan)
+    average_spread_below = average_spread_below.reindex(sorted_tickers, fill_value=np.nan)
 
-
+    # Creating the figure and primary axis for the bar chart
     fig, ax1 = plt.subplots(figsize=(20, 10))
-    ind = np.arange(len(sorted_tickers))# Stacked bar chart
+    ind = np.arange(len(sorted_tickers))
 
+    # Plotting the bar charts for above and below threshold predictions
+    ax1.bar(ind, below_threshold_counts, color='red', label='Short Strategy'.format(best_y))
+    ax1.bar(ind, above_threshold_counts, bottom=below_threshold_counts, color='green', label='Long Strategy'.format(best_x))
 
-    ax1.bar(ind, below_threshold_counts.values, label=f'Short Stategy for Predictions below the Threshold of {best_y:.4f} (LA)', color='red')
-    ax1.bar(ind, above_threshold_counts.values, bottom=below_threshold_counts.values, label=f'Long Strategy for Predictions above the Threshold of {best_x:.4f} (LA)', color='green')
+    # Creating a secondary y-axis for the average spreads
+    ax2 = ax1.twinx()
 
-    # Secondary axis for average spreads
-    ax2 = ax1.twinx()# Calculate lines of best fit
+    # Scatter plots for the average spreads
+    ax2.scatter(ind, average_spread_below, color='darkred', alpha=0.5, label='Average Spread for Short')
+    ax2.scatter(ind, average_spread_above, color='darkgreen', alpha=0.5, label='Average Spread for Long')
 
+    # Calculating and plotting lines of best fit for average spreads
     z_below = np.polyfit(ind[~np.isnan(average_spread_below)], average_spread_below.dropna(), 1)
-    z_above = np.polyfit(ind[~np.isnan(average_spread_above)], average_spread_above.dropna(), 1)
-
-    p_above = np.poly1d(z_above)
-    p_below = np.poly1d(z_below)# Scatter plots for average spreads with transparency and same shape
-
-
-    ax2.scatter(ind, average_spread_below, color='darkred', alpha=0.5, label=f'Average Spread', marker='o')
-    ax2.scatter(ind, average_spread_above, color='darkgreen', alpha=0.5, label=f'Average Spread', marker='o')# Plotting lines of best fit
-
-
+    p_below = np.poly1d(z_below)
     ax2.plot(ind, p_below(ind), 'r--', alpha=0.75)
+
+    z_above = np.polyfit(ind[~np.isnan(average_spread_above)], average_spread_above.dropna(), 1)
+    p_above = np.poly1d(z_above)
     ax2.plot(ind, p_above(ind), 'g--', alpha=0.75)
+
+    # Setting labels, ticks, legends, and formatting
     ax1.set_xticks(ind)
-    # Labeling and formatting
-    ax1.set_ylabel('Number of Trades')
-    ax1.set_xticklabels(sorted_tickers, rotation='vertical', fontsize=8)
+    ax1.set_xticklabels(sorted_tickers, rotation=90, fontsize=8)
+    ax1.set_ylabel('Number of Predictions', fontsize=18)
+    ax2.set_ylabel('Average Spread', fontsize=18)
 
-    ax2.set_ylabel('Average Spread')
-    ax1.set_title(f'Number of Trades and Average Spread per Ticker by Threshold for the {selected_time} Second Model', fontsize=15)
+    # Adjusting tick label size
+    #ax1.tick_params(axis='x', labelsize=8)  # Set fontsize for x-axis ticks
+    ax1.tick_params(axis='y', labelsize=14)  # Set fontsize for y-axis ticks
+    ax2.tick_params(axis='y', labelsize=14)  # Set fontsize for secondary y-axis ticks
 
-    # After plotting your data but before calling #plt.show()
+    ax1.legend(loc='upper left', fontsize=18)
+    ax2.legend(loc='upper right', fontsize=18)
+
+    ax1.grid(False)
+    ax2.grid(False)
     ax1.set_xlim(left=-0.5, right=len(sorted_tickers)-0.5)
 
-    # Adjusting the fontsize in the set_xticklabels method
-    ax1.set_xticklabels(sorted_tickers, rotation='vertical', fontsize=6)  # Reduced fontsize for smaller labels
+    fig.tight_layout()
 
-    handles1, labels1 = ax1.get_legend_handles_labels()
-    # Legend
-
-    handles2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper right')
-    # save the picture to a file
+    # Save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/number_of_trades_and_average_spread_per_ticker_by_threshold_for_straetgy_with_fixed_trades{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
-
-    #plt.show()
 
 
     import matplotlib.pyplot as plt
@@ -2231,7 +2491,7 @@ for z in time_options:
 
     #rename the box with the legend
     plt.legend(title='Predicted Return', loc='upper right')
-    plt.title(f'Spread vs. Return based on the Predicted Return for the Combined Strategy for the the {selected_time} Second Model ', fontsize=16)
+    #plt.title(f'Spread vs. Return based on the Predicted Return for the Combined Strategy for the the {selected_time} Second Model ', fontsize=16)
 
 
     plt.xlabel('Spread')
@@ -2253,13 +2513,14 @@ for z in time_options:
     # Generate ROC curve data
     fpr, tpr, thresholds = roc_curve(df_tottenham['midquote_target'], df_tottenham['predicted_return'])# Plot ROC curve
 
+
+    plt.figure(figsize=(8, 8))
     plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % auc_roc)
-    plt.figure(figsize=(8, 6))
     plt.xlim([0.0, 1.0])
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
     plt.xlabel('False Positive Rate')
-    plt.ylim([0.0, 1.05])
-    plt.title('Receiver Operating Characteristic')
+    plt.ylim([0.0, 1.0])
+    #plt.title('Receiver Operating Characteristic')
     plt.ylabel('True Positive Rate')
     plt.legend(loc="lower right")
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/roc_curve_and_performance_metrics_for_combined_strategy_for_the_fixed_strategy_setup{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
@@ -2285,17 +2546,18 @@ for z in time_options:
     excel_df.loc['Recall for the combined strategy for the optimization for Sharpe Ratio for the fixed trades strategy', selected_time] = recall
     excel_df.loc['F1 Score for the combined strategy for the optimization for Sharpe Ratio for the fixed trades strategy', selected_time] = f1# Calculating Confusion Matrix
 
-
     conf_matrix = confusion_matrix(df_tottenham['midquote_target'], df_tottenham['predicted_return'] > 0.5)
     tn, fp, fn, tp = conf_matrix.ravel()
     plt.figure(figsize=(8, 8))
     # Plotting the Confusion Matrix
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap='Blues', square=True,
-            xticklabels=['Negative', 'Positive'], yticklabels=['Negative', 'Positive'])
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
+            xticklabels=['0', '1'], yticklabels=['0', '1'],annot_kws={"size": 16})
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.xlabel('Predicted Label', fontsize=16)
+    plt.ylabel('True Label', fontsize=16)
 
-    plt.title('Confusion Matrix')
+    #plt.title('Confusion Matrix')
     # save the picture to a file
     plt.savefig(f'/Users/jensknudsen/Desktop/result/{selected_time}/overleaf/confusion_matrix_for_combined_strategy_for_the_fixed_strategy_setup{time_dict[selected_time]}.png',dpi=300, bbox_inches='tight')
     #plt.show()
@@ -2341,6 +2603,437 @@ for z in time_options:
 
 # save the excel_df to a excel file
 excel_df.to_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx')
+
+
+# N.B. TRY AND TEST IF THE SR IS ALREADY STANDARDIZED OR IS IT CORRECT TO DO IT
+standardized_dict = {'0,01': 25, '0,1': 2.5, '0,5': 1/2, '1': 1/4, '5': 1/20, '10': 1/40}
+# for the long threshold model
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+# Threshold strategy (long only)
+df = df.iloc[3:7]
+
+new_columns = ['SR for Long (val)', 'Threshold for long (val)', 'SR for Long(test)', 'ACC for long (test)']
+df.index = new_columns
+
+df = df.transpose()
+# delete the first row
+df = df.iloc[1:]
+
+df['SR for Long Std. (1 sec) (test)'] = df.apply(lambda row: row['SR for Long(test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+# make the last column the second last column
+cols = df.columns.tolist()
+# move the last column to the second last position
+cols = cols[:-2] + [cols[-1]] + [cols[-2]]
+df = df[cols]
+# make the last column the first column
+cols = [cols[-1]] + cols[:-1]
+df = df[cols]
+#mke the third column the first column
+cols = [cols[2]] + cols[:2] + cols[3:]
+df = df[cols]
+
+
+formatters = {
+    'Threshold for Long (val)': '{:0.4f}'.format,
+    'ACC for Long (test)': '{:0.4f}'.format,
+    'SR for Long (val)': '{:0.4f}'.format,
+    'SR for Long(test)': '{:0.4f}'.format,
+    'SR for Long Std. (1 sec) (test)': '{:0.4f}'.format
+}
+
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="For the Long Threshold Model",
+                         label="tab:long_threshold_model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/threshold_long_only.tex', 'w') as file:
+    file.write(latex_code)
+
+# for the Short threshold model
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+# Threshold strategy (long only)
+df = df.iloc[7:11]
+
+new_columns = ['SR for Short (val)', 'Threshold for Short (val)', 'SR for Short(test)', 'ACC for Short (test)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+df['SR for Short Std. (1 sec) (test)'] = df.apply(lambda row: row['SR for Short(test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+# make the last column the second last column
+cols = df.columns.tolist()
+# move the last column to the second last position
+cols = cols[:-2] + [cols[-1]] + [cols[-2]]
+df = df[cols]
+# make the last column the first column
+cols = [cols[-1]] + cols[:-1]
+df = df[cols]
+#mke the third column the first column
+cols = [cols[2]] + cols[:2] + cols[3:]
+df = df[cols]
+
+
+formatters = {
+    'Threshold for Short (val)': '{:0.4f}'.format,
+    'ACC for Short (test)': '{:0.4f}'.format,
+    'SR for Short (val)': '{:0.4f}'.format,
+    'SR for Short(test)': '{:0.4f}'.format,
+    'SR for Short Std. (1 sec) (test)': '{:0.4f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="For the Short Threshold Model",
+                         label="tab:Short_threshold_model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/threshold_short_only.tex', 'w') as file:
+    file.write(latex_code)
+
+
+# Combined for thresholds
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+df = df.iloc[11:16]
+new_columns = ['SR for Comb. (val)', 'Up. Thr. for Comb. (val)','Lo. Thr. for Comb. (val)', 'SR for Comb.(test)', 'ACC for Comb. (test)']
+
+df.index = new_columns
+
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+df['SR for Comb. Std. (1 sec) (test)'] = df.apply(lambda row: row['SR for Comb.(test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+# make the second last column the first column
+cols = df.columns.tolist()
+
+#move the second last column to the first position
+cols = [cols[-2]] + cols[:-2] + [cols[-1]]
+df = df[cols]
+
+# move the the 3 and 4 to the first and second column
+cols = [cols[2]] + [cols[3]] + cols[:2] + cols[4:]
+df = df[cols]
+
+
+
+formatters = {
+    'SR for Comb. (val)': '{:0.4f}'.format,
+    'Up. Thr. for Comb. (val)': '{:0.4f}'.format,
+    'Lo. Thr. for Comb. (val)': '{:0.4f}'.format,
+    'SR for Comb.(test)': '{:0.4f}'.format,
+    'ACC for Comb. (test)': '{:0.4f}'.format,
+    'SR for Comb. Std. (1 sec) (test)': '{:0.4f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="For the Comb. Threshold Model",
+                         label="tab:Comb._threshold_model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/threshold_Comb._only.tex', 'w') as file:
+    file.write(latex_code)
+
+# Combined for thresholds
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+df = df.iloc[20:23]
+
+
+new_columns = ['Ret (Combined)', 'Ret (Long)', 'Ret (Short)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+formatters = {
+    'Ret (Combined)': '{:0.3f}'.format,
+    'Ret (Long)': '{:0.3f}'.format,
+    'Ret (Short)': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="Return Based on Threshold Strategy",
+                         label="tab:Return_Based_on_Threshold_Strategy",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/Return_Based_on_Threshold_Strategy.tex', 'w') as file:
+    file.write(latex_code)
+
+# Overall performance (whole test set)
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+df = df.iloc[37:42]
+
+new_columns = ['AUC-ROC', 'Accuracy', 'Precision','Recall','F1 Score']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+formatters = {
+    'AUC-ROC': '{:0.3f}'.format,
+    'Accuracy': '{:0.3f}'.format,
+    'Precision': '{:0.3f}'.format,
+    'Recall': '{:0.3f}'.format,
+    'F1 Score': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="Metrics for the whole test set",
+                         label="tab:Metrics_for_the_whole_test_set",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/Metrics_for_the_whole_test_set.tex', 'w') as file:
+    file.write(latex_code)
+
+
+# Overall performance (for the fixed strategy only) 
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+df = df.iloc[52:57]
+
+
+new_columns = ['AUC-ROC', 'Accuracy', 'Precision','Recall','F1 Score']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+formatters = {
+    'AUC-ROC': '{:0.3f}'.format,
+    'Accuracy': '{:0.3f}'.format,
+    'Precision': '{:0.3f}'.format,
+    'Recall': '{:0.3f}'.format,
+    'F1 Score': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="Metric for the Fixed Strategy Model",
+                         label="tab:Metric_for_the_Fixed_Strategy_Model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/Metric_for_the_Fixed_Strategy_Model.tex', 'w') as file:
+    file.write(latex_code)
+
+
+
+# Overall performance (for the fixed strategy combined) 
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+
+df = df.iloc[42:45]
+
+
+new_columns = ['Opt. X (Val)', 'SR (Val)', 'SR (Test)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+df['SR Std. (1 sec) (Test)'] = df.apply(lambda row: row['SR (Test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+formatters = {
+    'Opt. X (Val)': '{:0.0f}'.format,
+    'SR (Val)': '{:0.3f}'.format,
+    'SR (Test)': '{:0.3f}'.format,
+    'SR Std. (1 sec) (Test)': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="SR for Combined Fixed Strategy Model",
+                         label="tab:SR_for_Combined_Fixed_Strategy_Model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/SR_for_Combined_Fixed_Strategy_Model.tex', 'w') as file:
+    file.write(latex_code)
+
+
+# Overall performance (for the fixed strategy long) 
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+
+df = df.iloc[45:48]
+
+
+new_columns = ['Opt. X (Val)', 'SR (Val)', 'SR (Test)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+df['SR Std. (1 sec) (Test)'] = df.apply(lambda row: row['SR (Test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+formatters = {
+    'Opt. X (Val)': '{:0.0f}'.format,
+    'SR (Val)': '{:0.3f}'.format,
+    'SR (Test)': '{:0.3f}'.format,
+    'SR Std. (1 sec) (Test)': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="SR for Long Fixed Strategy Model",
+                         label="tab:SR_for_Long_Fixed_Strategy_Model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/SR_for_Long_Fixed_Strategy_Model.tex', 'w') as file:
+    file.write(latex_code)
+
+
+# Overall performance (for the fixed strategy short) 
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+
+df = df.iloc[48:51]
+
+
+new_columns = ['Opt. X (Val)', 'SR (Val)', 'SR (Test)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+df['SR Std. (1 sec) (Test)'] = df.apply(lambda row: row['SR (Test)'] * math.sqrt(standardized_dict[row.name]), axis=1)
+
+formatters = {
+    'Opt. X (Val)': '{:0.0f}'.format,
+    'SR (Val)': '{:0.3f}'.format,
+    'SR (Test)': '{:0.3f}'.format,
+    'SR Std. (1 sec) (Test)': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="SR for Short Fixed Strategy Model",
+                         label="tab:SR_for_Short_Fixed_Strategy_Model",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/SR_for_Short_Fixed_Strategy_Model.tex', 'w') as file:
+    file.write(latex_code)
+
+
+# Overall performance (for the fixed strategy short) 
+import pandas as pd
+
+# import the dataframe
+df = pd.read_excel('/Users/jensknudsen/Desktop/result/overleaf.xlsx', index_col=False)
+
+
+df = df.iloc[57:63]
+
+
+new_columns = ['0 (Test)', '1 (Test)', '0 (Test (sub))', '1 (Test (sub))', '0 (Val)', '1 (Val)']
+df.index = new_columns
+
+df = df.transpose()
+
+# delete the first row
+df = df.iloc[1:]
+
+formatters = {
+    '0 (Test)': '{:0.0f}'.format,
+    '1 (Test)': '{:0.3f}'.format,
+    '0 (Test (sub))': '{:0.3f}'.format,
+    '1 (Test (sub))': '{:0.0f}'.format,
+    '0 (Val)': '{:0.3f}'.format,
+    '1 (Val)': '{:0.3f}'.format
+}
+
+# Generate LaTeX code
+latex_code = df.to_latex(caption="Distribution of 0s and 1s in the Test and Validation Sets",
+                         label="tab:Distribution_of_0s_and_1s_in_the_Test_and_Validation_Sets",
+                         formatters=formatters)
+
+# Add the [H] specifier to the table environment
+latex_code = latex_code.replace(r'\begin{table}', r'\begin{table}[H]')
+
+# Save the modified LaTeX code to a file
+with open('/Users/jensknudsen/Desktop/result/overleaf/Distribution_of_0s_and_1s_in_the_Test_and_Validation_Sets.tex', 'w') as file:
+    file.write(latex_code)
 
 
 ## COMBINING FILES INTO ONE FOLDER
